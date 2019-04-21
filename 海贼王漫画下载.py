@@ -80,31 +80,45 @@ def parse_sys_argv():
     else:
         return {}
 
-def download(i):
-    url = base_url % i
+def download(i, pic_type, fp, error_num=3):
+    url = base_url % (i, pic_type)
+    try:
+        resp = requests.get(url, timeout=10)
+        status = resp.status_code
+        if status == 404:
+            return False
+        if resp.ok:
+            pic_path_list.append(fp)
+            with open(fp, "wb") as f:
+                f.write(resp.content)
+                print(">>> " + fp)
+        else:
+            print("status[%s] text[%s]" % (status, resp.text()))
+    except Exception as e:
+        error_num -= 1
+        return download(i, pic_type, fp, error_num);
+        print("Error: request url [%s]" % url)
+    return True
+    
+
+def test(url):
     resp = requests.get(url, timeout=5)
     status = resp.status_code
     if status == 404:
-        return
+        return False
     if resp.ok:
-        fp = "%s/%s.png" % (temp_dir, i)
-        pic_path_list.append(fp)
-        with open(fp, "wb") as f:
-            f.write(resp.content)
-            print(">>> " + fp)
-    else:
-        print("status[%s] text[%s]" % (status, resp.text()))
-
+        return True
+    return False
 
 if __name__ == '__main__':
     param_dict = parse_sys_argv()
-    p = str(param_dict.get("p", 929))
+    p = str(param_dict.get("p", 940))
     cdir = os.path.dirname(os.path.abspath(__file__))
     temp_dir = cdir + "/temp/%s" % p
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
-    else:
-        clearDirs(temp_dir)
+    # else:
+    #     clearDirs(temp_dir)
 
     pic_path_list = []
 
@@ -113,20 +127,18 @@ if __name__ == '__main__':
     pic_type_list = ["png", "jpg"]
 
     for pic_type in pic_type_list:
-        for i in range(1, 100):
-            url = base_url % (i, pic_type)
-            resp = requests.get(url, timeout=5)
-            status = resp.status_code
-            if status == 404:
-                break
-            if resp.ok:
+        test_url = base_url % (1, pic_type)
+        flag = test(test_url)
+        if flag:
+            for i in range(1, 100):
                 fp = "%s/%s.%s" % (temp_dir, i, pic_type)
-                pic_path_list.append(fp)
-                with open(fp, "wb") as f:
-                    f.write(resp.content)
-                    print(">>> " + fp)
-            else:
-                print("status[%s] text[%s]" % (status, resp.text()))
+                if os.path.exists(fp):
+                    pic_path_list.append(fp)
+                    continue
+                if download(i, pic_type, fp, 3):
+                    continue
+                else:
+                    break
 
     comic_path = temp_dir + "/海贼王漫画%s.pdf" % p
     if len(pic_path_list) > 0:
